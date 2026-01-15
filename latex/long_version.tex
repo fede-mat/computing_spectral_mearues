@@ -1,0 +1,715 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{algpseudocode}
+\usepackage{bm}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\geometry{margin=0.5in}
+\title{Seminar in Computational Dynamics based on the article:\\ \textit{Computing Spectral Measures of Self-adjoint Operators}}
+\author{Federico Riva}
+\date{ \(15^{th}\) January 2026}
+
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\Op}{\mathcal{T}}
+\newcommand{\R}{\mathcal{R}}
+\newcommand{\I}{\mathcal{I}}
+\newcommand{\E}{\mathcal{E}}
+\newcommand{\e}{\mathcal{\epsilon}}
+
+\lstdefinestyle{matlab}{
+  language=Matlab,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{grey},
+  stringstyle=\color{purple},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=10pt,
+  frame=single,
+  breaklines=true,
+  showstringspaces=false
+}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+
+\theoremstyle{remark}
+\newtheorem{example}{Remark}[section]
+
+
+\begin{document}
+\maketitle
+\begin{abstract}
+After a brief recap on the required theory we develop an algorithm for computing smoothed approximation of spectral measures associated to self-adjoint operators on Hilbert spaces. We will exploit the additional regularity of the measure, which often occurs in many commonly used operators, to derive convergence estimates and find a way to improve the approximation rate.
+We also implement some relevant examples on MATLAB to highlight some experimental aspects.
+\end{abstract}
+\tableofcontents
+\newpage
+
+\newpage
+\section{Preliminary Notions on Spectral Theory}
+\subsection{Finite dimensional case}
+The notion of eigenvalue and eigenvector is well known in linear algebra for a linear operator on a finite dimensional space (i.e. a matrix) \( \Op : \C^n \rightarrow \C^n\) 
+\begin{equation} \Op (v) = \lambda v,  \lambda \in \C, v \in \C^n \  v \neq 0. \end{equation}
+We can also give the equivalent characterisation of an eigenvalue: 
+\begin{equation} \lambda \in \C \text{ is an eigenvalue of } \Op \iff \Op - \lambda \I \text{ is not bijective. }\end{equation}
+In fact, if \(\lambda\) is an eigenvalue by definition there exist a \( v \neq 0\) s.t. \((\Op-\lambda\I)(v)=0\), hence \( \operatorname{Ker}( \Op -\lambda \I ) \neq \{0\}\) and so it is not injective.
+On the other hand, by the \textit{Rank-Nullity Theorem}, an operator on a finite dimensional space is bijective \( \iff\) injective \( \iff \) surjective, so we can follow the previous step in the other direction to get the converse implication.
+\subsection{Infinite dimensional case}
+Let now consider the infinite dimensional case of an Hilbert \(\mathcal{H}\) space endowed with inner product \(\langle \cdot, \cdot \rangle \) and norm \( \lVert \cdot \rVert = \sqrt{\langle \cdot, \cdot \rangle} \).
+\begin{definition}[\textit{Resolvent Set and Resolvent Operator}]
+Consider an Hilbert space \(\mathcal{H}\) and let \( \Op: \mathcal{H} \rightarrow \mathcal{H} \) be a linear and continuous operator (i.e. \(\Op \in \mathcal{L}(\mathcal{H},\mathcal{H})\)) then the subset \begin{equation} \rho( \Op )= \{\lambda \in \C: \Op - \lambda\I \text{ is bijective }\} \subset \C \end{equation} is called the resolvent set of \( \Op\) and the mapping \begin{equation} \R(\lambda):= (\Op - \lambda \I)^{-1} \end{equation} defined \( \R:\rho(\Op) \rightarrow \mathcal{L}(\mathcal{H},\mathcal{H})\) is called the resolvent operator of \(\Op\). 
+\end{definition}
+\begin{definition}[\textit{Spectrum of an Operator: Point, Continuous and Residual Spectrum}]
+Let \(\mathcal{H}\) be a Hilbert space and \( \Op \in \mathcal{L}(\mathcal{H},\mathcal{H})\): 
+the subset \begin{equation}\sigma (\Op) = \C \setminus \rho(\Op)= \{\lambda: \lambda \in \C:  \Op - \lambda \I \text{ is not bijective }\}\end{equation} is called spectrum of \(\Op\). 
+More specifically:
+\begin{itemize}
+    \item  if \(\Op - \lambda \I\) is not injective, \( \lambda\) is called an eigenvalue of \(\Op\) with corresponding eigenspace \(\operatorname{Ker}(\Op - \lambda\I)\) and each element of the eigenspace is called eigenvector.\\
+    The set \begin{equation}\sigma_p(\Op) = \{ \lambda: \lambda \text{ is an eigenvalue} \}\end{equation} is called point spectrum of \(\Op\).
+    \item if \(\Op - \lambda \I\) is injective but not surjective:
+    \begin{itemize}
+        \item The set \begin{equation}\sigma_c(\Op) = \{ \lambda: \lambda \in \C: \Op - \lambda \I \text{ is injective but not surjective and } \overline{(\Op-\lambda\I)(\mathcal{H})}=\mathcal{H}\}\end{equation} is called the continuos spectrum of \(\Op\)
+        \item The set \begin{equation}\sigma_r(\Op) = \{ \lambda: \lambda \in \C: \Op - \lambda \I \text{ is injective but not surjective and } \overline{(\Op-\lambda\I)(\mathcal{H})}\neq\mathcal{H}\}\end{equation} is called the residual spectrum of \(\Op\)
+    \end{itemize}
+    
+\end{itemize}
+By definition \( \sigma(\Op)=\sigma_p(\Op)\cup\sigma_c(\Op)\cup\sigma_r(\Op)\).
+\end{definition}
+\begin{example}
+The residual spectrum for the self-adjoint operator \(\Op\) is the empty set and \(\sigma(\Op) \subset\mathbb{R}\).   
+\end{example}
+\begin{example}
+In finite dimensional spaces, due to the Rank-Nullity Theorem, \(\Op\) bijective\(\iff\)injective\(\iff\) surjective, hence \( \sigma(\Op)=\sigma_p(\Op) \) since \(\sigma_c(\Op)=\sigma_r(\Op)= \emptyset \).
+\end{example}
+An alternative partition of the spectrum of an operator is the following one:
+\begin{definition}[\textit{Isolated eigenvalues, discrete eigenvalues and essential spectrum}]
+An eigenvalue \(\tilde{\lambda} \in \sigma(\Op)\) is said to be an isolated eigenvalue if there exists a neighbourhood of radius \(\e >0 \) such that \(\mathcal{B}_\e(\tilde{\lambda}) \cap\sigma(\Op) = \tilde{\lambda}\). If additionally \(\operatorname{dim}\operatorname{Ker(\Op- \tilde{\lambda}\I)} < \infty\) (i.e. finite geometrical multiplicity) then is called discrete eigenvalues. The essential spectrum is defined as \(\sigma_{ess}(\Op)= \sigma(\Op) \setminus \{\lambda: \text{discrete eigenvalues} \}\)   
+\end{definition}
+\begin{example}
+Recall some properties of the essential spectrum:
+\begin{itemize}
+    \item The essential spectrum can contain isolated eigenvalues with infinite geometrical multiplicity
+    \item \(\sigma_c(\Op) \subseteq \sigma_{ess}(\Op)\)
+    \item The essential spectrum is invariant under compact perturbation. That is, if \(\mathcal{K}\) is a compact self-adjoint operator on \(\mathcal{H}\) then \( \sigma_{ess}(\Op + \mathcal{K}) = \sigma_{ess}(\Op)\).  
+\end{itemize}
+\end{example}
+
+\subsection{Projection Valued Measure and Spectral Theorem}
+In this section we define a particular version of the Spectral Theorem that will be very useful for our purposes.
+The main idea is to generalize the following interpretation of the Spectral Theorem for symmetric matrices to self-adjoint operators. 
+We know that for a symmetric matrix \(A \in \C^{n \times n}\) there exits an orthonormal basis of eigenvectors \( v_1, \dots, v_n \in \C^n\) such that 
+\begin{equation}\label{spec_for_matricex}
+v  = \underbrace{( \sum_{k=1}^n v_k v_k^*)}_{= \I}v,  \quad v \in \C^n \quad \text{and} \quad Av =  \left( \sum_{k=1}^n \lambda_k v_k v_k^*\right) v, \quad v \in \C^n
+\end{equation}
+Define \(V_k = v_k v_k^* \ \forall k =1, \dots n\) and see that each \(V_k\) is the orthogonal projector on to the eigenspace associate to \( \operatorname{Ker}(A-\lambda_k\I)\).
+ Hence if we define \(\mathcal{P}_\lambda\) the orthogonal projector  \( \operatorname{Ker}(A-\lambda\I)\) we can rewrite (\ref{spec_for_matricex}) as
+ \begin{equation}
+     v  = \underbrace{ \sum_{\lambda \in \mathbb{R}} \mathcal{P}_\lambda}_{= \I} v,  \quad v \in \C^n \quad \text{and} \quad Av =  \left(\sum_{\lambda \in \mathbb{R}}  \lambda \mathcal{P}_\lambda \right)v, \quad v \in \C^n
+ \end{equation}
+ It is important to notice that the series are well defined because \(\mathcal{P}_\lambda=0\) for \(\lambda \notin \sigma(A)\) which has finitely many elements.
+To generalize this it is natural to expect that one must replace series with integrals. Thus we are looking for some form of integration of functions taking values in the space of orthogonal projectors on the Hilbert space where the operator is defined.
+\begin{definition}[\textit{Projection Valued Measure}]
+Let \(\mathcal{H}\) denote a separable Hilbert space and \( (\C, \mathcal{B}(\C))\) a measurable space.
+A projection valued measure \(\E\) on \( \mathcal{H}\) is a map \begin{equation} \mathcal{B}(\C)) \rightarrow \mathcal{P}_{|\mathcal{H}}\end{equation}
+from the \(\sigma\)-algebra of Borel subset of \(\C\) to the set of projectors on \(\mathcal{H}\) such that the following conditions holds
+\begin{itemize}
+    \item \( \E(\emptyset)=0\), \( \E(\C)=\I\)
+    \item \( \forall \ \Omega  \in \mathcal{B}(\C)\), \( \E(\Omega)\) is an orthogonal projection i.e. \(\E(\Omega) \circ \E(\Omega) = \E(\Omega)\) and \( \E(\Omega)^*= \E(\Omega)\)
+    \item \( \{ \Omega_i\}_{i \in \mathbb{N}}\) disjoint sequence of sets then \( \forall \ v \in \mathcal{H}\) then \( \E( \bigcup_{i \in \mathbb{N}}\Omega_i) v= \sum_{i \in \mathbb{N}} \E(\Omega_i)v\)
+\end{itemize}    
+\end{definition}
+\begin{example}
+    The self-adjointness property for the projection valued measure operator follows by definition of orthogonality of the projection.
+\end{example}
+\begin{definition}[\textit{Spectral Measure}]
+Lets now consider \( \phi, \psi \in \mathcal{H}\), then the projection valued measure induces a complex valued measure on \(\mathcal{B}(\C)\) called \textit{spectral measure} defined as
+\begin{equation}\mu_{\phi, \psi}(\Omega)=\langle\E(\Omega) \phi, \psi \rangle \quad \forall \Omega \in \mathcal{B}(\C).\end{equation}
+\end{definition}
+
+\begin{example}
+    Notice that the measure \(\mu_{\phi,\psi}\) is finite by construction due to the Cauchy–Schwarz's Inequality. 
+\end{example}
+If \(\phi = \psi\) then the projection valued measure induces a real valued \textit{spectral measure} and if \( \|\phi\|=1\) then \( \mu_\phi\) is a probability measure since \( \mu_\phi(\C) = \langle\E(\C) \phi, \phi\rangle=\langle \I \phi,\phi \rangle = 1\)
+
+\begin{theorem}[Spectral Theorem in projection-valued form]
+Let \(\mathcal{H}\) be a separable Hilbert space and \(\Op: \mathcal{H} \rightarrow \mathcal{H}\) a bounded self adjoint operator on H. There exist a unique projection-valued measure \(\E\) such that\begin{equation}\Op = \int_\mathbb{R} \lambda d\E(\lambda)\end{equation}
+Moreover, if \(f \in \mathcal{C}(\sigma(\Op))\), \( f: \mathbb{R} \rightarrow \C\), we have
+\begin{equation}\label{functional_calculus}
+f(\Op)= \int_{\sigma(\Op)} f(\lambda) d \E(\lambda) 
+\end{equation} 
+\end{theorem}
+\begin{example}
+    The second statement of the Spectral Theorem (\ref{functional_calculus}) is part of the so called functional calculus. What is relevant for our purposes is that using that identity we are able to characterize continuos functions of the operator. 
+\end{example}   
+\begin{example}
+Notice that for \( \tilde{\lambda} \notin \sigma(\Op) \) the projection valued measure \(\E(\{\tilde{\lambda}\}) =0 \). Hence the spectral measure \(\mu\) will have mass only on the spectrum of \(\Op\) since \( \mu_\phi(\tilde{\lambda})=\langle E(\{\tilde{\lambda}\}) \phi, \phi \rangle\). Our goal will be estimate this measure numerically to find the spectrum of the operator.
+\end{example}
+\begin{example}
+A natural question that arises is how the choice of \(\phi\) affects the spectral measure \( \mu\). It can be proven that \(\mu\) does not depend on \( \phi\). 
+We only need to be careful not to choose a function \(\phi \perp \operatorname{Ker}(\Op- \lambda\I)\) otherwise we would not be able to detect the mass of the measure in \(\lambda\) since \( \mu (\lambda)  = \langle E({\{\lambda}\}) \phi,\phi\rangle =0 \). \\
+A priori a proper choice of \(\phi\) is not predicable and we will see an example of this issue in a simple case of a \( 2 \times 2\) matrix. 
+\end{example}
+In practical application we are interested in the spectrum of the operator and since \( \mu\) has mass exactly on this set we can equivalently compute this quantity to obtain the spectrum. However, by construction of the spectral measure \(\mu\), we need to be able to explicitly characterize the projection valued measure \(\E\) to further proceed.
+\begin{theorem}[Stone formula]
+Let $\Op$ be a self--adjoint operator on a separable Hilbert space $\mathcal H$ and let $E$ be the
+projection--valued measure associated with $\Op$ by the spectral theorem.
+Then, for all $a<b$,
+\[
+\frac{1}{2\pi i}\int_a^b\bigl(R(s+i\varepsilon)-R(s-i\varepsilon)\bigr)\,ds
+\;\xrightarrow[\varepsilon\to0]{\mathrm{s}}\;
+\frac12\bigl(\E((a,b))+\E([a,b])\bigr),
+\]
+where $R(z)=(\Op-zI)^{-1}$ is the resolvent of $\Op$ and the convergence is in the
+\emph{strong operator topology}.
+\end{theorem}
+
+\begin{proof}
+Let $\varepsilon>0$ and fix an arbitrary vector $u\in\mathcal H$.
+Define
+\[
+A_\varepsilon
+:= \frac{1}{2\pi i}\int_a^b\bigl(R(s+i\varepsilon)-R(s-i\varepsilon)\bigr)\,ds .
+\]
+
+Using the functional calculus and Fubini--Tonelli's theorem (see Remark \ref{ft}), we obtain
+\begin{align*}
+A_\varepsilon u
+&= \frac{1}{2\pi i}\int_a^b
+\int_{\sigma(\Op)}
+\left(\frac{1}{t-(s+i\varepsilon)}-\frac{1}{t-(s-i\varepsilon)}\right)
+\,d\E(t)\,ds\,u \\
+&= \frac{1}{\pi}\int_a^b
+\int_{\sigma(\Op)} \frac{\varepsilon}{(s-t)^2+\varepsilon^2}\,d\E(t)\,ds\,u \\
+&= \int_{\sigma(\Op)} g_\varepsilon(t)\,d\E(t)\,u,
+\end{align*}
+where
+\[
+g_\varepsilon(t)
+:= \frac{1}{\pi}\int_a^b \frac{\varepsilon}{(s-t)^2+\varepsilon^2}\,ds .
+\]
+
+For every $t\in\mathbb R$ one computes
+\[
+\lim_{\varepsilon\to0} g_\varepsilon(t)
+= \frac{1}{\pi}
+\left(
+\arctan\frac{b-t}{\varepsilon}
+-
+\arctan\frac{a-t}{\varepsilon}
+\right)
+=l(t)=
+\begin{cases}
+0, & t<a \text{ or } t>b, \\[4pt]
+1, & t\in(a,b), \\[4pt]
+\frac12, & t=a,b.
+\end{cases}
+\]
+and define \(l(t)=\tfrac12\mathbf 1_{[a,b]}(t)+\tfrac12\mathbf 1_{(a,b)}(t).\)
+Moreover, $0\le g_\varepsilon(t)\le 1$ for all $t$ and all $\varepsilon>0$.
+Let $\mu_u(B)=\langle \E(B)u,u\rangle$ be the scalar spectral measure associated with $u$.
+By the \textit{Dominated convergence Theorem},
+\[
+\|A_\varepsilon u - Pu\|^2 = 
+\underbrace{\langle (A_\varepsilon  - P)u,(A_\varepsilon  - P)u\rangle
+= \langle (A_\e-P)^2u,u \rangle}_{ \text{ * } }
+= \int_{\sigma(\Op)} |g_\varepsilon(t)-l(t)|^2\,d\mu_u(t)
+\;\longrightarrow\; 0,
+\]
+where * holds due to the normality of the resolvent operator and complex properties of functional calculus. 
+Since $u\in\mathcal H$ was arbitrary, this proves that
+\[
+A_\varepsilon \xrightarrow{\mathrm{s}} P =\tfrac12\bigl(\E((a,b))+\E([a,b])\bigr),
+\]
+that is, the convergence holds in the strong operator topology.
+\end{proof}
+\begin{example}
+On a first glance it may seem that we are evaluating the resolvent operator on the spectrum i.e. on the complementary of its domain. However by construction we are adding \( \pm i\e\) to the evaluation point and this makes everything well defined since \(\sigma(\Op) \subset \mathbb{R}\). 
+\end{example}
+\begin{example}\label{ft}
+In proof we where able to apply Fubini-Tonelli Theorem to \( \mu_u(B):=\langle \E(B)u,u\rangle \) since for every $t\in\mathbb R$,
+\[
+\int_a^b \frac{\varepsilon}{(s-t)^2+\varepsilon^2}\,ds
+\le
+\int_{\mathbb R} \frac{\varepsilon}{(s-t)^2+\varepsilon^2}\,ds
+= \pi.
+\]
+Hence,
+\[\frac{1}{2 \pi i}
+\int_a^b \int_{\sigma(\Op)}
+\left(
+\frac{1}{t-(s+i\varepsilon)}-\frac{1}{t-(s-i\varepsilon)}
+\right)
+\,d\mu_u(t)\,ds
+\le
+\pi\,\mu_u(\mathbb R)
+= \pi \|u\|^2 < \infty,
+\]
+so the hypotheses of Fubini--Tonelli are satisfied.
+\end{example}
+
+\begin{example}
+    Stone Formula is a solution to the limitation of computing the spectral measure because we can  write the projection valued measure as the limit of an explicitly know quantity, i.e. the resolvent operator.
+    Recall that by definition:
+    \[\R(x+ i\e)f = (\Op-(x+i\e)\I)^{-1}f \] which is equivalent to find \(u\in \mathcal{H}\) such that \[(\Op-(x+a)\I)u=f \] 
+\end{example}
+
+\section{The Article}
+\subsection{Introduction}
+We will work under the following settings: \(\Op\) is a self-adjoint operator on a separable Hilbert space \(\mathcal{H}\) and the quantity of interest is the spectral measure associated to the operator. In general the eigenvalues and eigenvectors of an infinite dimensional operator with discrete spectrum are  computed by discretizing and employing a matrix eigenvalue solver. Computing spectral measure is more subtle. \\
+Recall that the spectral measure of \(\Op\) w.r.t \( f \in \mathcal{H}\) is a scalar measure defined as 
+\[ \mu_f(\Omega) = \langle \E(\Omega) f,f\rangle \quad\forall \ \Omega \in \mathcal{B}(\mathbb{R}).\]
+First of all consider the Lebesgue decomposition of \(\mu_f\)
+\begin{equation} d\mu_f(y) = \sum_{\lambda \in \sigma_p(\Op)}\langle\mathcal{P}_{\lambda}f,f\rangle \delta(y-\lambda)dy+ \rho_f(y)dy + d\mu_f^{(sc)}(y)\end{equation}
+where the discrete part of \(\mu_f\) is a sum of Dirac delta distributions supported on the set of the eigenvalues of \(\Op\). The coefficient of each \(\delta\) is given by the orthogonal spectral projector \( \mathcal{P}_\lambda= \E(\{\lambda\})\). The continuos part consists of an absolutely continuos part w.r.t. the Lebesgue measure with Radon-Nikodym derivative \( \rho_f \in L^1(\mathbb{R})\) and a singular continuous component \(\mu_f^{(s.c.)}\). \\
+The goal is to find \(\mu_f\) by evaluating a smoothed approximation of \(\mu_f\) when \(\Op\) has non-empty continuos spectrum. This means that we compute samples from a smooth function \(g_\e\), with smoothing parameter \( \e > 0\), which converges weakly to \(\mu_f\) (in the probability sense) i.e.
+\begin{equation}
+\int_{\mathbb{R}} \phi(y)\, g_\varepsilon(y)\, dy 
+\;\rightarrow\; 
+\int_{\mathbb{R}} \phi(y)\, d\mu_f(y)
+\quad \text{as } \varepsilon \to 0, \quad \forall \ \phi \in \mathcal{C}_b(\mathbb{R}).
+\end{equation}
+
+\subsection{The evaluate the spectral measure: a resolvent operator based approach}
+The key approach to compute spectral measure is to combine its definition with the resolvent operator \(\R\) of \(\Op\) and the Stone's formula
+\begin{equation}
+\lim_{\e \rightarrow 0} \frac{1}{2 \pi i }\int_a^b{\R(s+i\e)-\R(s-i\e) ds} = \frac12(\E((a.b)) + \E([a,b]))
+\end{equation}
+to obtain an approximation that weakly converges.\\
+Consider the pointwise limit
+\begin{equation} \langle ( \frac{1}{2 \pi i}\R(x+i\e)-\R(x-i\e))f,f\rangle \rightarrow \mu_f(x) \text{ as } \e \rightarrow 0 \end{equation}
+which is equivalent to
+\begin{equation}\label{simplify}
+\frac{1}{\pi} \operatorname{Im}(\langle \R(x+ i\e)f,f\rangle) \rightarrow \mu_f(x) \ \text{as } \e \rightarrow 0  . 
+\end{equation}
+Recall that by functional calculus we can write
+\begin{equation}
+\mu_f^\e(x)=\frac{1}{2\pi i} \int_{\mathbb{R}} \left( \frac{1}{y - (x + i\varepsilon)} - \frac{1}{y - (x - i\varepsilon)} \right) d\mu_f(y) 
+=\frac1\pi \int_r{\frac{\e}{\e^2+(x-y)^2}d\mu_f(y)}
+\end{equation}
+where we can recognize the definition of the Poisson kernel \( K_\e(t):= \frac1\pi \frac{\e}{\e^2 +t^2}\).\\
+Hence we need to compute the following limit
+\begin{equation}
+\lim_{\varepsilon \to 0} \int_{\mathbb{R}} K_\varepsilon(x-y) \, d\mu_f(y)=\mu_f(x).
+\end{equation}
+where we exploit the fact that 
+\begin{equation}
+K_\varepsilon(t-\lambda) \rightarrow \delta(t-\lambda) \ \text{ as } \varepsilon \to 0,
+\end{equation}
+i.e.
+\begin{equation}
+\int_{\mathbb{R}} K_\varepsilon(t-\lambda) \phi(t) \, dt \rightarrow \phi(\lambda) \quad \forall \phi \in \mathcal{C}_c^\infty(\mathbb{R})
+\end{equation}
+From pointwise convergence, applying the \textit{Dominated Convergence Theorem} with Holder inequality, we obtain weak convergence. 
+\begin{example}
+If before taking the limit we substitute the \textit{Lebesgue Decomposition} of \(\mu_f\) and for simplicity we assume that the measure has no singular continuos part we obtain the following 
+\begin{equation}
+\lim_{\e \rightarrow 0}
+\underbrace{\frac{1}{\pi} \sum_{\lambda \in \sigma_p(\Op)}
+\frac{\varepsilon \, \langle E(\{\lambda\}) f, f \rangle}{\varepsilon^2 + (x-\lambda)^2}}_{A}
+\;+\;
+\underbrace{
+\frac{1}{\pi} \int_{\mathbb{R}} 
+\frac{\varepsilon \, \rho_f(y)}{\varepsilon^2 + (x-y)^2} \, dy}_{B}
+\end{equation}
+A: is a series of Poisson kernels centred at the eigenvalues and scaled but the corresponding projection coefficient which converges to the discrete part of \(\mu_f\). \\
+B: by \textit{Dominated Convergence Theorem}, since the R.N. derivative is \(L^1\) and the Poisson Kernel is bounded, converge pointwise to \(\rho_f(x)\).
+Hence we manage to construct a pointwise estimate of \( \mu_f(x)\). \\
+Typically one wants to approximate the spectral measure in several points \(x_1, \dots ,x_n \in \mathbb{R} \) and construct a global or local estimate. \\Note that if \( x_j \notin \sigma(\Op)\) then \( \mu_f^\e(x_j) \rightarrow 0 \).
+\end{example}
+\begin{example}
+Due to our implementation goal we are interested in some computational aspects. In practice, the cost to evaluate \(\mu_f^\e \) at \(x_0 \in \sigma(\Op)\) increases as \(\e \rightarrow 0\) since by definition of  the resolvent operator is unbounded in the limit. For this reason it would be ideal to improve the convergence rate of \( \mu_f^\e \rightarrow \mu_f\) in order not to be forced to make \(\e\) very small to get a better estimate of \(\mu_f\). 
+The solution of this problem lies in asking some additional regularity assumption on the spectral measure \(\mu_f\) under which we are able to improve the convergence rate and quantify this improvement.   
+\end{example}
+\begin{definition}[\textit{Hölder Continuos Functions}]
+We denote with \( \mathcal{C}^{k,\alpha}(I)\) the space of functions that are k-time continuously differentiable and \(\alpha\)-Hölder continuos on the k-th derivative. \\
+We define the following seminorm and norm:
+\begin{equation} | h|_{\mathcal{C}^{0,\alpha}(I)} = \sup \frac{|h(x)-h(y)|}{|x-y|^\alpha},\quad
+\| h\|_\mathcal{C}^{k,\alpha}(I) = |h^{(k)}|_{\mathcal{C}^{0,\alpha}(I)} + \max_{0 \leq j \leq k} \| h^{(j)}\|_{\infty,I}
+\end{equation}
+\end{definition}
+\begin{theorem}[Convergence rate under additional regularity assumptions]
+Suppose that $\mu_f$ is absolutely continuous on the interval \(I = (x_0 - \eta, \, x_0 + \eta)\) for some $x_0 \in \mathbb{R}$ and $\eta > 0$. 
+Let \(\mu_f^{\e}\) be defined as before and let \(0 \leq \alpha < 1\). 
+If \(\rho_f \in \mathcal{C}^{0,\alpha}(I)\) then
+\begin{equation} | \rho_f(x_0) - \mu_f^\e(x_0)| = \mathcal{O}(\e^\alpha)\end{equation} more precisely 
+\begin{equation} | \rho_f(x_0) - \mu_f^\e(x_0)| \leq \left( |\rho_f|_{\mathcal{C}^{0,\alpha}(I)} + C \eta^{-\alpha}\| \rho_f\|_{\infty,I}\right) \sec(\frac{\alpha\pi}{2}) \e^\alpha + \frac{\e}{\pi(\e^2+ \frac{\eta^2}{4})} \quad \alpha \in [0,1). \end{equation}
+\end{theorem}
+\begin{example}
+Notice that the convergence degrades close to singular points in the spectral measure since \( \eta \rightarrow 0\).
+\end{example}  
+\begin{example}
+We can show that with the Poisson kernel if \( \rho_f \in \mathcal{C}^1\) the convergence rate becomes \( \mathcal{O}(\e \log(\frac{1}{\e}))\) and no further assumptions on the regularity of \( \rho_f \) make the convergence faster since it is limited buy the type of the kernel itself. Naturally the next step is to try to construct suitable kernel that can exploit the smoothens of the measure. 
+\end{example}
+
+\subsubsection{Example}
+In order to understand the general procedure is useful to understand the following simple case.
+Consider as the self-adjoint operator \(\Op\) a symmetric matrix \( A: \mathbb{R}^2 \rightarrow \mathbb{R}^2\) for example 
+\begin{equation*}A=
+\begin{pmatrix}
+    1 & 2 \\
+    2 & 1
+\end{pmatrix} = 
+\begin{pmatrix}
+    -1 & 1 \\
+    1 & 1
+\end{pmatrix}
+\begin{pmatrix}
+    -1 & 0 \\
+    0 & 3 
+\end{pmatrix}\frac12
+\begin{pmatrix}
+    -1 & 1 \\
+    1 & 1
+\end{pmatrix}
+\end{equation*}
+\textbf{Solution:}
+Consider the normalized eigenvectors:
+\[
+v_1=\frac1{\sqrt2}\begin{pmatrix}1\\1\end{pmatrix},
+\qquad
+v_2=\frac1{\sqrt2}\begin{pmatrix}1\\-1\end{pmatrix},
+\]
+and the associate projection matrix on the eigenspaces
+\[
+P_1=v_1v_1^*
+=\frac12
+\begin{pmatrix}
+1&1\\
+1&1
+\end{pmatrix},
+\qquad
+P_2=v_2 v_2^*
+=\frac12
+\begin{pmatrix}
+1&-1\\
+-1&1
+\end{pmatrix}.
+\]
+For any given vector \(f \in \mathbb{R}^2\) with norm \( \|f\|=f_1^2+f_2^2=1\) compute the associated spectral measure:
+\[
+P_1 f=\frac12
+\begin{pmatrix}
+f_1+f_2\\
+f_1+f_2
+\end{pmatrix},
+\qquad
+P_2 f=\frac12
+\begin{pmatrix}
+f_1-f_2\\
+-(f_1-f_2)
+\end{pmatrix},
+\]
+
+\[
+\langle P_1 f,f\rangle=\frac12 (f_1+f_2)^2,
+\qquad
+\langle P_2 f,f\rangle=\frac12 (f_1-f_2)^2,
+\]
+\[
+\mu_f
+=
+\frac12 (f_1+f_2)^2\,\delta_{3}
++
+\frac12 (f_1-f_2)^2\,\delta_{-1}.
+\]
+
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{matrix_spec_meaure.jpg}
+        \caption{Approximation of the spectral measure \(\mu_f^\e(x)\) for \(\e=0.1\) and \(\e=0.01\)}
+        \label{fig_1_1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figure_1.jpg}
+        \caption{Plot of the spectral measure \(\mu_f^\e(x)\) as a function of \(x\) and \(\e\)}
+        \label{fig_1_2}
+    \end{subfigure}
+    \label{fig_1}
+\end{figure}
+
+
+\begin{example}
+There are some important remarks about this example:
+    \begin{itemize}
+        \item since the operator is a matrix we will observe a purely point spectrum i.e. under the spectral measure point of view two Dirac masses. 
+        \item Lower and upper bounds on the domain of \(x\) for the evaluation of \(\mu_f^\e(x)\) are obtained using the spectral estimate derived from the Frobenius norm of the matrix.
+        \item the choice of the vector \texttt{f} affects the measure \(\mu_\texttt{f}\) that we will compute. In fact, \texttt{f}=\([\frac12;\frac12]\) it is orthogonal to one of the eigenspaces we will not be able to detect the associated eigenvalue , \(-1\), since the projection valued measure is orthogonal to \texttt{f}, \[\mu_f(-1)= \langle\underbrace{\E(\{-1\} ) [\frac12;\frac12]}_{=0},[\frac12;\frac12]\rangle\underbrace{\delta(0)}_{=1}=0\].  
+    \end{itemize}
+\end{example}
+\subsection{Higher order kernels and how to construct them}
+Consider the approximation error 
+\begin{equation}
+[K_\e * \mu_f](x_0) - \rho_f(x_0) = \int_\mathbb{R}K_\e(y)(\rho_f(x_0-y)-\rho_f(x_0)) dy.\end{equation}
+Assume that \( \rho_f \in \mathcal{C}^{n,\alpha}(I)\) so that we can use the \(n\)-th order Taylor approximation of \(\rho_f(x_0-y)-\rho_f(x_0)\) to rewrite the approximation error as
+\begin{equation}
+[K_\e * \mu_f](x_0) - \rho_f(x_0) = \sum_{k=1}^{n-1} \frac{(-1)^k\rho_f^{(k)}(x_0)}{k!}\int_\mathbb{R} K_\e(y)y^kdy + \int_\mathbb{R}K_\e(y)R(x_0,y)dy 
+\end{equation}
+where \(R_n(x_0,y)\) denotes the \(\mathcal{O}(|y|^n)\) remainder term in the Taylor series. Considering a change of variable \( y \rightarrow \e y \) inside the integral reveals that the \(k\)-th element of the series is  of size \(\mathcal{O}(\e^k)\) if \(K(y)y^k\) is integrable. The Holder continuity of \(\rho_f^{(n)}\) shows that the term involving \(R_n(x_0,y)\) is of size \(\mathcal{O}(\e^{n+\alpha})\) provided \( K(y)y^{n+\alpha}\) is integrable. \\
+Overall the approximation error achieves \(\mathcal{O}(\e^{n+\alpha})\) if \( \int_\mathbb{R} K(y)y^k dy = 0 \quad \forall \ 1 \leq k < n\). 
+\begin{definition}[\textit{\(m\)-th order Kernel}]
+Let \(m\) be a positive integer and \(K \in L^1(\mathbb{R})\).  We say that \(K\) is a m-th order kernel if it satisfies the following properties:
+\begin{itemize}
+\item Normalization, scaling and convergence: \( \int_\mathbb{R}{K(x) dx=1} \), \( K_\e(x) = \frac1eK_1(x) \) and \\ \(K_\e \rightarrow \delta \text{ as } \e \rightarrow 0\)
+\item Zero Moments: \( \int_\mathbb{R}{K(x)x^j dx=0} \quad \forall \ 0 < j < m\)
+\item Decay at \(\pm \infty\): There is a constant \(C_K\), independent of x, such that \( | K(x) | \leq  \frac{C_k}{(1+ |x|)^{m+1}}\)
+\end{itemize}
+\end{definition}
+\begin{example}
+    The Poisson kernel is a first order kernel
+\end{example}
+We can now state a more advanced version of Theorem 2.1.
+\begin{theorem}[Convergence rate with a m-th order kernel with regularity assumptions]
+Let K be an  m-th order kernel and suppose that $\mu_f$ is absolutely continuous on the interval \(I = (x_0 - \eta, \, x_0 + \eta)\) for some $x_0 \in \mathbb{R}$ and $\eta > 0$. Let \(\rho_f\) be the Radon Nikodym derivative of the absolutely continuous component of \(\mu_f\) and suppose that \( \rho_f \in \mathcal{C}^{n,\alpha}(I)\) with \(\alpha \in [0,1)\). Denote the pointwise error by \( E_\e(x) = |\rho_f(x) - [K_\e * \mu_f](x) |\).
+Then the following holds:
+\begin{itemize}
+    \item if \(n+\alpha < m \),then  for a constant \( C(n,a)\) 
+    \begin{equation} E_\e(x_0) \leq \frac{C_K \e^m}{(\e + \frac\eta2)^{m+1}}+C(n,\alpha)\|\ \rho_f\|_{\mathcal{C}^{n,\alpha}(I)} \int_\mathbb{R}|K(y)||y|^{n+\alpha}dy(1+\eta^{-n-\alpha})\e^{n+\alpha} \end{equation}
+    \item if \(n+\alpha \geq m \),then for a constant \( C(m)\) 
+    \begin{equation} E_\e(x_0) \leq \frac{C_K \e^m}{(\e + \frac\eta2)^{m+1}}+C(m)\|\ \rho_f\|_{\mathcal{C}^{m}(I)} \left( C_k+\int_{-\frac\eta\e}^{\frac\eta\e}|K(y)||y|^{m}dy \right) (1+\eta^{-m})\e^{m}\end{equation}
+\end{itemize}
+Using the boundedness of the definition of a \(m\)-th order kernel we obtain
+\begin{equation}
+|\rho_f(x) - [K_\e * \mu_f](x)| = \mathcal{O}(\e^{n+\alpha}) + \mathcal{O}(\e^m \log(1/\e)) 
+\end{equation}
+where the logarithmic term appears in the case that \(K(x)x^m\) is not integrable. 
+\end{theorem}
+Now that we know the  properties for a kernel of \(m\)-th order we can develop a resolvent-based approach to approximately evaluate a spectral measure and achieve the desired convergence rate increasing the order of the kernel. However it is still not clear how to construct a kernel that arises from Stone's Formula and is of \(m\)-th order. The solution are the so called \textit{Rational kernels}.
+To construct them recall the procedure we have followed to construct the approximation of the spectral measure
+\begin{equation} \langle ( \frac{1}{2 \pi i}\R(x+i\e)-\R(x-i\e))f,f\rangle = [K_\e * \mu_f](x) \rightarrow \mu_f(x) \text{ as } \e \rightarrow 0. \end{equation}
+In this case the Poisson kernel was
+\begin{equation}
+K_\e(y)= \frac{1}{2\pi i}\left(\frac{1}{y-(i\e)} - \frac{1}{y - (-i\e)}\right)
+\end{equation}
+We replace \(K \) with a generic rational function i.e.
+\begin{equation}
+K(y) = \frac{1}{2 \pi i}\left(\sum_{j=1}^{n_1}\frac{\alpha_j}{y-a_j}- \sum_{j=1}^{n_2}\frac{\beta_j}{y-b_j} \right)
+\end{equation}
+where \( a_j \in \C^+\) and \(b_j \in \C^-\) and we restrict \(K\) to have simple poles to avoid having to compute power of the resolvent. 
+If we replace the Poisson kernel with the latter one in the approximation of the spectral measure we obtain
+\begin{equation}
+[K_\e * \mu_f](x) = \int_\mathbb{R} \frac{1}{2 \pi i}\left(\sum_{j=1}^{n_1}\frac{\alpha_j}{(y-x)-a_j}- \sum_{j=1}^{n_2}\frac{\beta_j}{(y-x)-b_j} \right) d\mu_f(y)
+\label{eq:big_formula}
+\end{equation}
+and by functional calculus and the properties of the complex scalar product
+\begin{equation}
+[K_\e * \mu_f](x) =  \frac{-1}{2 \pi i} \left(   \sum_{j=1}^{n_1} \langle \R(x-\e a_j) f,f\rangle- \sum_{j=1}^{n_2}  \langle \R(x-\e b_j)f,f\rangle\right). 
+\end{equation}
+Our goal now is to choose the poles and the residuals such that \(K \) is a \(m\)-th order Kernel. 
+First of all we want our kernel to be \(\mathcal{O}(|y|^{-(m+1)})\).
+We can rewrite our kernel as the quotient of  \(n_1+n_2-1\) and  \(n_1+n_2\) degree polynomials 
+\begin{equation}
+K(y)= \frac{\sum_{j=1}^{n_1} \alpha_j\prod_{l \neq j \ l=1}^{n_1} (y-a_l) \prod_{k=1}^{n_2}(y-b_k)- \sum_{j=1}^{n_2} \beta_j\prod_{l \neq j \ l=1}^{n_2} (y-b_l) \prod_{k=1}^{n_1}(y-a_k)}{\prod_{j=1}^{n_1}(y-a_j)\prod_{j=1}^{n_2}(y-b_j)}
+\end{equation}
+and in this expression the coefficient associated to the highest order them in the numerator is \( C=\sum_{j=1}^{n_1}\alpha_j- \sum_{j=1}^{n_2}\beta_j\). 
+For \( |y| \rightarrow \infty\) we have \(K(y) \approx C \frac{y^{n_1+n_2-1}}{y^{n_1+n_2}}=  \mathcal{O}(\frac1y)\) hence we need \(C=0\), i.e. \(\sum_{j=1}^{n_1}\alpha_j- \sum_{j=1}^{n_2}\beta_j=0\), to avoid such a convergence rate. 
+Since we have deleted the \(\mathcal{O}(\frac1y)\) term we have \(K(y)=\mathcal{O}(\frac1y^2)\).  
+With the previous computation we have established a strategy to get rid of the highest order term.
+Hence to get rid of the \(\mathcal{O}(\frac1y^k)\) term consider \(K(y)y^k \) and recalling that
+\begin{equation}
+\frac{y^k}{y-a}= \sum_{l=0}^{k-1}a^ly^{k-1-l} + \frac{a^k}{y-a}
+\end{equation}
+we obtain
+\begin{equation}
+K(y)y^k = \frac{1}{2 \pi i} \left( \sum_{l=0}^{k-1}y^{k-l-1}\left(\underbrace{\sum_{j=1}^{n_1}\alpha_j a_j^l - \sum_{j=1}^{n_1}\beta_j b_j^l}_{=0 \ \forall \ l=0,\dots,k-1}  \right) + \sum_{j=1}^{n_1}\alpha_j a_j^k - \sum_{j=1}^{n_1}\beta_j b_j^k \right)
+\end{equation}
+where by inductive construction we have already set all the lower order terms equal 0. \\
+A \(m\)-th order kernel need to fulfils also the Normalization and Zero Moment conditions. \\
+Since they are both integral conditions (it total \(m\) integrals) we can apply the Residual Theorem first on a semicircle on the upper complex plane and then to one in the lower complex plan.\\
+We find that the moments can be written in term of the poles and the residuals
+\begin{equation} \sum_{j=1}^{n_1} \alpha_j a_j^k= \int_\mathbb{R}K(y) y^k dy = \sum_{j=1}^{n_2} \beta_j b_j^k =  \begin{cases} 1 \quad k=0 \\ 0 \quad \forall \ k=1, \dots, m-1. \end{cases}
+\end{equation}
+Notice that the constraints form the zero-moment condition are equivalent to those one obtained for the asymptotic decay. All the constraints that a \(m\)-th order kernel needs to fulfils can be summarized into the transposed Vandermonde System:
+\begin{equation}
+\begin{pmatrix}
+1 & \dots & 1\\
+a_1 & \dots & a_{n_1} \\
+\vdots & \ddots & \\
+a_1^{m-1} & \dots & a_{n_1}^{m-1}
+\end{pmatrix}
+\begin{pmatrix}
+    \alpha_1 \\
+    \vdots \\
+    \alpha_{n_1} 
+\end{pmatrix}=
+\begin{pmatrix}
+    1 \\
+    0 \\
+    \vdots \\
+    0
+\end{pmatrix}=
+\begin{pmatrix}
+1 & \dots & 1\\
+b_1 & \dots & b_{n_2} \\
+\vdots & \ddots & \\
+b_1^{m-1} & \dots & b_{n_2}^{m-1}
+\end{pmatrix}
+\begin{pmatrix}
+    \beta_1 \\
+    \vdots \\
+    \beta_{n_2}
+\end{pmatrix}.
+\end{equation}
+The system is guaranteed to have a solution for \( n_1, n_2 \geq m\) but for computational efficiency we choose \(n_1=n_2=m.\) The systems tells also us that the most convenient thing to do in practice is first choose the poles \(a_j\) and \(b_j\)(for example as equispaced nodes) and then compute the associated residuals \(\alpha_j \) and \(\beta_j\). In order to reduce the computational cost we can choose \(\alpha_j= \bar{\beta_j}\) this avoids us to evaluate   the resolvent operator (i.e. solve a linear system) in (\ref{eq:big_formula}) \(2m\) times. As in the Poisson kernel in (\ref{simplify}), (\ref{eq:big_formula}) can be simplified as 
+\begin{equation}
+[K_\e * \mu_f](x) = - \frac1\pi \sum_{j=0}^m \operatorname{Im}( \alpha_j \langle \R(x-\e a_j)f,f\rangle 
+\end{equation}
+which require only \(m\) evaluations of the resolvent operator. \\
+We  can summarize the entire procedure in the following algorithm.
+\begin{algorithm}
+\caption{A practical framework for evaluating an approximate spectral measure of an operator
+$\Op$ at $x_0 \in \mathbb R$ with respect to a vector $f \in \mathcal H$.}
+\begin{algorithmic}[1]
+\label{alg}
+\Require $\Op : D(\mathcal L) \to \mathcal H$, $f \in \mathcal H$, $x_0 \in \mathbb R$, 
+$a_1,\dots,a_m \in \{ z \in \mathbb C : \operatorname{Im}(z) > 0 \}$, $\varepsilon > 0$
+\Ensure $\mu_f^\varepsilon(x_0)$
+
+\State Solve the Vandermonde system for the residues $\alpha_1,\dots,\alpha_m \in \mathbb C$.
+\For{$j = 1$ to $m$}
+    \State Solve $(\Op - (x_0 - \varepsilon a_j)) u_j^\varepsilon = f$ 
+    \Comment{i.e. evaluate the resolvent $\R(x_0-\varepsilon a_j) f$}
+\EndFor
+\State Compute
+\[
+\mu_f^\varepsilon(x_0) = \frac{1}{\pi} \operatorname{Im} \left( \sum_{j=1}^m \alpha_j \langle u_j^\varepsilon, f \rangle \right)
+\]
+\end{algorithmic}
+\end{algorithm}
+\begin{example}
+    Notice that the algorithm is fully parallelizable. 
+\end{example}
+
+\subsection{The resolvent framework in practice: an example}
+As a benchmark of our resolving algorithm we consider the following operator \(\Op: \mathcal{H} \rightarrow \mathcal{H}\)
+\begin{equation}
+[\Op u](x) := xu(x) + \int_{-1}^1e^{-x^2+y^2}u(y)dy,  \quad  \mathcal{H}= L^2[-1,1],\   x \in I=[-1,1]  
+\end{equation}
+\(\Op\) is composed by two operators: a  multiplicative operator \(\mathcal{M}\) and a compact integral operator with smooth kernel \(\mathcal{K}\). Notice that they are both self-adjoint, hence also \(\Op\).\\
+Lets study their spectrum separately: for the multiplicative operator a standard result in operator theory states that given
+\begin{equation}
+\mathcal{M}[u](x) =g(x)u(x) \ x \in I \text{ then }
+\sigma(\mathcal{M}) = \{ \lambda: \mathcal{M}- \lambda\I \text{ is not bijective}\} = \operatorname{Ran}(g_I)  
+\end{equation}
+and the spectrum is all essential since there are non isolated point if \(g\) is smooth. Morover there are no eigenvalues. 
+Since \(\mathcal{K}\) is compact, by invariance of the essential spectrum under compact perturbations,  we only need to find the isolated eigenvalues that in the case of compact operator is the point spectrum.
+Notice that the operator \(\mathcal{K}\) has rank 1 since 
+\[
+\mathcal{K}[u](x) = e^{-x^2} \int_{-1}^1e^{-y^2}u(y)dy
+\]
+Find the point spectrum by solving the transcendental equation
+\begin{equation}
+    xu(x) + e^{-x^2} \int_{-1}^1e^{-y^2}u(y)dy = \lambda u(x)
+\end{equation}
+which simplifies as
+\begin{equation}
+1+ \int_{-1}^1\frac{e^{-2y^2}}{x-\lambda}dy =0   
+\end{equation}
+We can numerically find that \( \lambda \simeq 1.37\). 
+\begin{equation}
+\sigma(\Op) =[-1,1]\cup\{1.37...\}    
+\end{equation}
+Then we discretize the operators as follows:
+choose a set of equispaced nodes \( x_1=-1\), \( x_N=1 \text{ and } x_j=-1+(j-1)h \ \forall j=1, \dots,N \ h= \frac{2}{N-1}\). The main idea is to approximate the unknown eigenfunction \(u \in L^2[-1,1]\) on the defined mesh \(u_i \simeq u(x_i)\) obtaining a finite dimensional eigenvalues problem.  
+\begin{equation}
+\Op u = \lambda u, \ u \in L^2[-1,1] \rightarrow
+T \texttt{u} = \lambda \texttt{u} ,\ \texttt{u}\in \mathbb{R}^N, T  \in \mathbb{R}^{N\times N}
+\end{equation}
+The discretization of the multiplicative operator is
+\begin{equation}
+    \mathcal{M}[u](x_i)= x_i u(x_i) \rightarrow M \texttt{u} = \begin{pmatrix}
+        x_1  & 0 & \dots & 0 \\
+        0 & x_2 & \dots & 0 \\
+        0 & 0 & \ddots & 0 \\
+        0 & \dots & 0 & x_N
+    \end{pmatrix} 
+    \begin{pmatrix}
+        \texttt{u}_1 \\
+        \texttt{u}_2 \\
+        \vdots \\
+        \texttt{u}_N\end{pmatrix}
+\end{equation}
+while for the compact one we discretize the integral with trapezoidal quadrature weights
+\[
+ w_j=h \ \forall \ j = 1,\dots,N-1 \quad w_1=w_N=\frac h2
+\]
+\begin{equation}
+    \mathcal{K}[u](x_i) = \int_{-1}^1 e^{-x_i^2+y^2}u(y) dy \approx \sum_{j=1}^Ne^{-x_i^2+x_j^2}u(x_j)w_j, 
+    \end{equation}
+    \begin{equation*}K\texttt{u} = \begin{pmatrix}
+e^{-x_1^2+x_1^2} w_1
+& e^{-x_1^2+x_2^2} w_2
+& \cdots
+& e^{-x_1^2+x_N^2} w_N
+\\[6pt]
+e^{-x_2^2+x_1^2} w_1
+& e^{-x_2^2+x_2^2} w_2
+& \cdots
+& e^{-x_2^2+x_N^2} w_N
+\\[6pt]
+\vdots
+& \vdots
+& \ddots
+& \vdots
+\\[6pt]
+e^{-x_N^2+x_1^2} w_1
+& e^{-x_N^2+x_2^2} w_2
+& \cdots
+& e^{-x_N^2+x_N^2} w_N
+\end{pmatrix}
+    \begin{pmatrix}
+        \texttt{u}_1 \\
+        \texttt{u}_2 \\
+        \vdots \\
+        \texttt{u}_N
+        \end{pmatrix}
+\end{equation*}
+Hence
+\begin{equation}
+    (T)_{i,j}= (M_x)_{i,j}+K_{i,j}
+\end{equation}
+where \( (M_x)_{i,j} = x_i \delta_{i,j}\) and \((K)_{i,j} = e^{-x_i^2-x_j^2}w_j\)
+
+We then compare the standard procedure of computing numerically the eigenvalues of \(T\) with the spectral measure computed in \textbf{Algorithm (1)}.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{example_2.jpg}
+        \caption{Approximation of the spectral measure \(\mu_f^\e(x)\) for \(\e=0.1\) and \(\e=0.01\)}
+        \label{fig_2_1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{example_2_1.jpg}
+        \caption{Plot of the spectral measure \(\mu_f^\e(x)\) as a function of \(x\) and \(\e\)}
+        \label{fig_2_2}
+    \end{subfigure}
+    \label{fig_2}
+\end{figure}
+
+\begin{example}
+This example shows pros and cons of using a first order kernel to approximate more complicated spectral measures.
+In our case what makes the difference between obtaining a reasonably looking spectral measure or not is the trade of between the order of the discretization of the operator, the number of point where we compute the spectral measure and the value of \(\e\) compared to the order of the kernel. 
+\end{example}
+
+\end{document}
